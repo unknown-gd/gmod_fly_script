@@ -417,7 +417,7 @@ end
 hook.Add("CalcMainActivity", "PrikolMen's Fly Script", function(ply, velocity)
     if ply:GetNWBool( "PrikolMen's Fly Script:InFlight", false ) then
 
-         if not ply:IsOnGround() then
+        if not ply:IsOnGround() then
             local idealact = ACT_INVALID
             if IsValid( ply:GetActiveWeapon() ) then
                 idealact = ACT_MP_SWIM
