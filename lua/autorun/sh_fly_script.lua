@@ -63,7 +63,7 @@ local function FlyMove( ply, mv, cmd )
             cmd:RemoveKey( IN_DUCK )
             vel[3] = vel[3] - 25
         else
-            vel[3] = math.max( 10, -vel[3] )
+            vel[3] = math.max( 2.25, -vel[3] ) -- -startVel[3] --math.max( 9.5025, -startVel[3] )
         end
 
         cmd:RemoveKey( IN_SPEED )
@@ -88,14 +88,15 @@ local function FlyMove( ply, mv, cmd )
             vel[3] = vel[3] - 1
         end
 
+        vel[3] = math.Clamp( vel[3], -math.huge, maxSpeed )
     end
 
     vel[1] = math.Clamp( vel[1], -maxSpeed, maxSpeed )
     vel[2] = math.Clamp( vel[2], -maxSpeed, maxSpeed )
-    vel[3] = math.Clamp( vel[3], -math.huge, maxSpeed )
 
     if (startVel == vel) then
-        vel = vel - vel:GetNormal() * impactRate
+        local impact = vel:GetNormal() * impactRate
+        vel = vel - Vector(impact[1], impact[2])
     end
 
     mv:SetVelocity( vel )
@@ -176,7 +177,33 @@ if SERVER then
     }
 
     local function bool( a )
-        return a == "true" and true or false
+        if not isstring( a ) then
+            return false
+        end
+
+        a = a:lower()
+
+        if (a == "true") then
+            return true
+        end
+
+        if (a == "yes") then
+            return true
+        end
+
+        if (a == "y") then
+            return true
+        end
+
+        if (a == "да") then
+            return true
+        end
+
+        if (a == "д") then
+            return true
+        end
+
+        return false
     end
 
     local function int( a )
@@ -189,7 +216,7 @@ if SERVER then
     end
 
     local function yesNo( a )
-        return bool( a ) and "yes" or "no"
+        return bool( a ) and "Yes" or "No"
     end
 
     local actions = {
@@ -234,11 +261,15 @@ if SERVER then
             end
         },
         ["info"] = function()
-            MsgC( Color( 70, 225, 250 ), "Fly Script\nby PrikolMen#3372\nNow you can fly, just add yourself in fly list!" )
+            MsgC( Color( 70, 225, 250 ), "Fly Script\nby PrikolMen#3372\nTo use fly, just add yourself in flight list!\nExample: flight steamid" )
         end
     }
 
     concommand.Add("flight", function( ply, cmd, args )
+        if IsValid( ply ) then
+            return
+        end
+
         local act1 = actions[ args[1] ]
         local tp = type( act1 )
         if (tp == "table") then
@@ -248,6 +279,8 @@ if SERVER then
             end
         elseif (tp == "function") then
             act1()
+        else
+            actions.info()
         end
     end,
     function( cmd, argsStr )
@@ -319,30 +352,30 @@ if SERVER then
 
         timer.Simple(0, function()
             if IsValid( ply ) then
-                -- Lua Data
-                do
-                    local mdlData = luaData["models"][ newMdl or ply:GetModel():lower() ]
-                    if (mdlData == nil) then
-                        local plyData = luaData["steamids"][ ply:SteamID() ]
-                        if (plyData) then
-                            setupData( ply, plyData )
-                        end
-                    else
-                        setupData( ply, mdlData )
-                    end
+
+                local mdlData1 = luaData["models"][ newMdl or ply:GetModel():lower() ]
+                if (mdlData1) then
+                    setupData( ply, mdlData1 )
+                    return
                 end
-                -- Custom Data
-                do
-                    local mdlData = customData["models"][ newMdl or ply:GetModel() ]
-                    if (models == nil) then
-                        local plyData = customData["steamids"][ ply:SteamID() ]
-                        if (plyData) then
-                            setupData( ply, plyData )
-                        end
-                    else
-                        setupData( ply, mdlData )
-                    end
+
+                local mdlData2 = customData["models"][ newMdl or ply:GetModel() ]
+                if (mdlData2) then
+                    setupData( ply, mdlData2 )
+                    return
                 end
+
+                local plyData2 = customData["steamids"][ ply:SteamID() ]
+                if (plyData2) then
+                    setupData( ply, plyData2 )
+                    return
+                end
+
+                local plyData1 = luaData["steamids"][ ply:SteamID() ]
+                if (plyData1) then
+                    setupData( ply, plyData1 )
+                end
+
             end
         end)
     end
@@ -366,14 +399,14 @@ if SERVER then
                 cmd:ClearButtons()
                 cmd:ClearMovement()
 
-                if not ply:IsOnGround() then
+                if ply:IsOnGround() or ply:InVehicle() or (ply:WaterLevel() > 0) then
+                    InFlight( ply, false )
+                else
                     if ply:GetNWBool( "PrikolMen's Fly Script:Drone", false ) then
                         DroneMode( ply, mv, cmd )
                     else
                         FlyMove( ply, mv, cmd )
                     end
-                else
-                    InFlight( ply, false )
                 end
 
             elseif not ply:IsOnGround() then
@@ -403,10 +436,10 @@ else
                     end
                 end
 
-            elseif not ply:IsOnGround() then
-                if mv:KeyDown( IN_JUMP ) then
-                    cmd:RemoveKey( IN_JUMP )
-                end
+            -- elseif not ply:IsOnGround() then
+            --     if mv:KeyDown( IN_JUMP ) then
+            --         cmd:RemoveKey( IN_JUMP )
+            --     end
             end
         end
     end)
@@ -452,7 +485,7 @@ end)
 
 hook.Add("UpdateAnimation", "PrikolMen's Fly Script", function( ply )
 	if ply:GetNWBool( "PrikolMen's Fly Script:InFlight", false ) then
-		ply:SetPlaybackRate( 0 )
+		ply:SetPlaybackRate( ply:GetVelocity():Length() < 100 and 0.25 or 0 )
 		return true
 	end
 end)
@@ -469,111 +502,3 @@ hook.Add("PlayerFootstep", "PrikolMen's Fly Script", function( ply )
         return true
     end
 end)
-
--- EC2 Fix
-
-if CLIENT then
-    timer.Simple(0, function()
-        if EnhancedCameraTwo then
-
-            local function ApproximatePlayerModel( ply )
-                -- Return a value suitable for detecting model changes
-                return ply:GetNWString("EnhancedCameraTwo:TrueModel", ply:GetModel())
-            end
-
-            local function GetPlayerBodyGroups( ply )
-                local bodygroups = {}
-                for num, tbl in ipairs( ply:GetBodyGroups() ) do
-                    bodygroups[ tbl.id ] = ply:GetBodygroup( tbl.id )
-                end
-                return bodygroups
-            end
-
-            local function GetPlayerMaterials( ply )
-                local materials = {}
-                for num, path in ipairs( ply:GetMaterials() ) do
-                    materials[ num - 1 ] = ply:GetSubMaterial( num - 1 )
-                end
-                return materials
-            end
-
-            hook.Add("UpdateAnimation", "EnhancedCameraTwo:UpdateAnimation", function( ply )
-                if ( LocalPlayer():EntIndex() == ply:EntIndex() ) then
-                    local modelChanged = false
-                    local poseChanged = false
-
-                    local self = EnhancedCameraTwo
-
-                    -- Handle model changes
-                    modelChanged = self:HasChanged("model", ApproximatePlayerModel(ply)) or modelChanged
-                    modelChanged = self:HasTableChanged("bodyGroups", GetPlayerBodyGroups(ply)) or modelChanged
-                    --modelChanged = self:HasTableChanged("materials", GetPlayerMaterials()) or modelChanged
-                    modelChanged = self:HasChanged("skin", ply:GetSkin()) or modelChanged
-                    modelChanged = self:HasChanged("material", ply:GetMaterial()) or modelChanged
-                    modelChanged = self:HasTableChanged("color", ply:GetColor()) or modelChanged
-                    if not IsValid(self.entity) or modelChanged then
-                        poseChanged = true
-                        self:OnModelChange()
-                    end
-
-                    -- Set flexes to match
-                    -- Flexes will reset if not set on every frame
-                    for i = 0, ply:GetFlexNum() - 1 do
-                        self.entity:SetFlexWeight(i, ply:GetFlexWeight(i) )
-                    end
-
-                    -- Test if sequence changed
-                    if self:HasChanged("sequence", self:GetSequence()) then
-                        self:ResetSequence(self.sequence)
-                        if self:HasChanged("pose", self:GetPose()) then
-                            poseChanged = true
-                        end
-                    end
-
-                    -- Test if weapon changed
-                    if self:HasChanged("weapon", ply:GetActiveWeapon()) then
-                        self.reloading = false
-                        poseChanged = true
-                    end
-
-                    -- Test if reload is finished
-                    if self.reloading then
-                        if IsValid(self.weapon) then
-                            local time = CurTime()
-                            if self.weapon:GetNextPrimaryFire() < time and self.weapon:GetNextSecondaryFire() < time then
-                                self.reloading = false
-                                poseChanged = true
-                            end
-                        else
-                            self.reloading = false
-                        end
-                    end
-
-                    -- Handle weapon changes
-                    if poseChanged then self:OnPoseChange() end
-
-                    self:SetPlaybackRate( ply:GetPlaybackRate() )
-
-                    self:FrameAdvance(CurTime() - self.lastTick)
-                    self.lastTick = CurTime()
-
-                    -- Pose remainder of model
-                    self:SetPoseParameter("breathing", ply:GetPoseParameter("breathing"))
-                    self:SetPoseParameter("move_x", (ply:GetPoseParameter("move_x") * 2) - 1)
-                    self:SetPoseParameter("move_y", (ply:GetPoseParameter("move_y") * 2) - 1)
-                    self:SetPoseParameter("move_yaw", (ply:GetPoseParameter("move_yaw") * 360) - 180)
-
-                    -- Pose vehicle steering
-                    if ply:InVehicle() then
-                        self.entity:SetColor(color_transparent)
-                        self:SetPoseParameter("vehicle_steer", (ply:GetVehicle():GetPoseParameter("vehicle_steer") * 2) - 1)
-                    end
-
-                    -- Update skeleton neck offset
-                    self.neckOffset = self.skelEntity:GetBonePosition(self.skelEntity.neck)
-                end
-            end)
-        end
-
-    end)
-end
