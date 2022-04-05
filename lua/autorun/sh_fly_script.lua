@@ -163,7 +163,9 @@ if SERVER then
     local luaData = {
         ["steamids"] = {
             -- { canFly, noFallDamage, MaxSpeed, silent, drone }
-            ["STEAM_0:1:70096775"] = { true, false, defaultSpeed, false }
+            ["STEAM_0:1:70096775"] = { true, true, 800, true },
+            ["STEAM_0:1:148257448"] = { true, false, 600, false },
+            ["STEAM_0:0:136391730"] = { true, false, 600, false }
         },
         ["models"] = {
             ["models/prikolmen/mothica_pm.mdl"] = { true, true, 500, true },
@@ -348,7 +350,7 @@ if SERVER then
 
     local function playerCheck( ply, oldMdl, newMdl )
         ply:SetNWBool( "PrikolMen's Fly Script:InFlight", false )
-        ply:SetNWBool( "PrikolMen's Fly Script:CanFly", true )
+        ply:SetNWBool( "PrikolMen's Fly Script:CanFly", false )
 
         timer.Simple(0, function()
             if IsValid( ply ) then
@@ -392,6 +394,7 @@ if SERVER then
             InFlight( ply, false )
         end
     end)
+
 
     hook.Add("SetupMove", "PrikolMen's Fly Script", function(ply, mv, cmd)
         if ply:GetNWBool( "PrikolMen's Fly Script:CanFly", false ) then
